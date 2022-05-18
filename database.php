@@ -9,7 +9,7 @@ class Database {
     private $host = 'localhost';
     private $user = 'root';
     private $password = 'masterpw';
-    private $db = 'AFM_storage';
+    private $db = 'project_storage';
 
     /**
      * Creates a simple database-connection.
@@ -33,36 +33,34 @@ class Database {
     }
 
     /**
-     * Create file Table
+     * Create User Table
      * ---
-     * Checks if "files" table exists already.
+     * Checks if "user" table exists already.
      * Creates the table if not already exist.
      *
-     * TABLE files:
-     *  - file_id
-     *  - file name
-     *  - file
-     *  - sample
-     *  - image size
-     *  - time per line
-     *  - nr of lines
+     * TABLE user:
+     *  - user_id
+     *  - username
+     *  - password
+     *  - email
+     *  - register_date
      */
-
-    private function create_user_table() {
+    private function create_sample_table() {
         // here: create table if not exist.
         try {
             $conn = $this->create_connection();
-            if (!$this->check_if_table_exist($conn, 'user')) {
+            if (!$this->check_if_table_exist($conn, 'samples')) {
                 // sql to create table
-                $sql = "CREATE TABLE user (
-                    user_id INT(11) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-                    username VARCHAR(40) NOT NULL,
-                    password VARCHAR(160) NOT NULL,
-                    email VARCHAR(60),
-                    register_date TIMESTAMP )";
+                $sql = "CREATE TABLE samples (
+                    sample_id INT(11) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                    sample_name VARCHAR(40) NOT NULL,
+                    material VARCHAR(40) NOT NULL,
+                    set_up_date VARCHAR(160) NOT NULL,
+                    container_number VARCHAR(60),
+                    TIMESTAMP )";
                 // use exec() because no results are returned
                 $conn->exec($sql);
-                echo "user table created successfully";
+                echo "sample table created successfully";
             } else {
                 // echo "user table already exist.";
             }
@@ -72,58 +70,27 @@ class Database {
         $conn = null;
     }
 
-    public function prepare_storage() {
-        $this->create_user_table();
-        return true;
-    }
-
-    public function prepare_registration() {
-        $this->create_user_table();
-        return true;
-    }
-
-    public function register_user($username, $password, $email=null) {
-        // here: insert a new user into the database.
+    private function create_nid_table() {
+        // here: create table if not exist.
         try {
             $conn = $this->create_connection();
-            $query = "SELECT * FROM `user` WHERE username = ?";
-            $statement = $conn->prepare($query);
-            $statement->execute([$username]);
-
-            $user = $statement->fetchAll(PDO::FETCH_CLASS);
-            if (!empty($user)) {
-                return false;
+            if (!$this->check_if_table_exist($conn, 'nid_files')) {
+                // sql to create table
+                $sql = "CREATE TABLE nid_files (
+                    nid_id INT(11) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                    sample_id VARCHAR(40) NOT NULL,
+                    nid_name VARCHAR(40) NOT NULL,
+                    date_of_recording VARCHAR(50) NOT NULL,
+                    nr_of_lines VARCHAR(5),
+                    TIMESTAMP )";
+                // use exec() because no results are returned
+                $conn->exec($sql);
+                echo "nid table created successfully";
+            } else {
+                // echo "user table already exist.";
             }
         } catch (PDOException $e) {
             echo $e->getMessage();
         }
-
-        // now: save user.
-        try {
-            $conn = $this->create_connection();
-
-            $sql = 'INSERT INTO user(username, password, email, register_date)
-            VALUES(?, ?, ?, NOW())';
-            $statement = $conn->prepare($sql);
-            $password_hash = password_hash($password, PASSWORD_DEFAULT);
-            $statement->execute([$username, $password_hash, $email]);
-            return true;
-        } catch (PDOException $e) {
-            echo $e->getMessage();
-        }
-
-        return false;
+        $conn = null;
     }
-
-    public function drop_all() {
-        try {
-            $conn = $this->create_connection();
-
-            $sql = 'DROP TABLE user';
-            $conn->exec($sql);
-        } catch (PDOException $e) {
-            echo $e->getMessage();
-        }
-        return false;
-    }
-}
