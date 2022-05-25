@@ -8,7 +8,7 @@ class Database {
 
     private $host = 'localhost';
     private $user = 'root';
-    private $password = 'masterpw';
+    private $password = 'root';
     private $db = 'project_storage';
 
     /**
@@ -32,19 +32,8 @@ class Database {
         return true;
     }
 
-    /**
-     * Create User Table
-     * ---
-     * Checks if "user" table exists already.
-     * Creates the table if not already exist.
-     *
-     * TABLE user:
-     *  - user_id
-     *  - username
-     *  - password
-     *  - email
-     *  - register_date
-     */
+
+
     private function create_sample_table() {
         // here: create table if not exist.
         try {
@@ -55,9 +44,9 @@ class Database {
                     sample_id INT(11) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
                     sample_name VARCHAR(40) NOT NULL,
                     material VARCHAR(40) NOT NULL,
-                    set_up_date VARCHAR(160) NOT NULL,
-                    container_number VARCHAR(60),
-                    TIMESTAMP )";
+                    setup_date TIMESTAMP,
+                    container_number VARCHAR(10)
+                    )";
                 // use exec() because no results are returned
                 $conn->exec($sql);
                 echo "sample table created successfully";
@@ -70,6 +59,7 @@ class Database {
         $conn = null;
     }
 
+    
     private function create_nid_table() {
         // here: create table if not exist.
         try {
@@ -78,12 +68,20 @@ class Database {
                 // sql to create table
                 $sql = "CREATE TABLE nid_files (
                     nid_id INT(11) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-                    sample_id VARCHAR(40) NOT NULL,
+                    sample_id INT(11) UNSIGNED NOT NULL,
                     nid_name VARCHAR(40) NOT NULL,
                     date_of_recording VARCHAR(50) NOT NULL,
                     nr_of_lines VARCHAR(5),
-                    TIMESTAMP )";
+                    save_date TIMESTAMP )";
                 // use exec() because no results are returned
+                $conn->exec($sql);
+                $sql = "
+                ALTER TABLE `nid_files`  
+                ADD CONSTRAINT `FK_nid_files_samples` 
+                    FOREIGN KEY (`sample_id`) REFERENCES `samples`(`sample_id`) 
+                        ON UPDATE CASCADE 
+                        ON DELETE CASCADE;
+                ";
                 $conn->exec($sql);
                 echo "nid table created successfully";
             } else {
@@ -94,3 +92,63 @@ class Database {
         }
         $conn = null;
     }
+
+    public function prepare_registration() {
+        $this->create_sample_table();
+        $this->create_nid_table();
+        return true;
+    }
+    
+
+    public function register_sample($sample_name, $material, $container_number) {
+        // here: insert a new sample into the database.
+        try {
+            $conn = $this->create_connection();
+            $query = "SELECT * FROM `samples` WHERE sample_name = ?";
+            $statement = $conn->prepare($query);
+            $statement->execute([$sample_name]);
+
+            $sample = $statement->fetchAll(PDO::FETCH_CLASS);
+            if (!empty($sample)) {
+                return false;
+            }
+        } catch (PDOException $e) {
+            echo $e->getMessage();
+        }
+
+        // now: save sample.
+        try {
+            $conn = $this->create_connection();
+
+            $sql = 'INSERT INTO samples(sample_name, material, container_number, setup_date)
+            VALUES(?, ?, ?, NOW())';
+            $statement = $conn->prepare($sql);
+            $statement->execute([$sample_name, $material, $container_number]);
+            return true;
+        } catch (PDOException $e) {
+            echo $e->getMessage();
+        }
+
+        return false;
+    }
+    
+    public function drop_all() {
+        try {
+            $conn = $this->create_connection();
+            
+            $sql = 'ALTER TABLE `nid_files`
+                DROP FOREIGN KEY `FK_nid_files_samples`;';
+            $conn->exec($sql);
+
+            $sql = 'DROP TABLE nid_files';
+            $conn->exec($sql);
+
+            $sql = 'DROP TABLE samples';
+            $conn->exec($sql);
+
+        } catch (PDOException $e) {
+            echo $e->getMessage();
+        }
+        return false;
+    }
+}
